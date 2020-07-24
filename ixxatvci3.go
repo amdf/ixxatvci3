@@ -234,9 +234,9 @@ func CloseDevice(devnum uint8) (vcierr uint32) {
 	return
 }
 
-//OpenChannelDetectBitrate открывает канал на открытом ранее устройстве с номером devnum, и пытается определить битрейт в канале CAN.
-//Битрейт определяется из числа возможных, заданных через массив bitrate с несколькими парами значений регистров btr0 и btr1.
-//Если канал открыт и битрейт определён, возвращается пара значений btr0, btr1.
+// OpenChannelDetectBitrate opens a channel on the previously opened device with devnum number, and tries to determine the bitrate in the CAN channel.
+// The bitrate is determined from the number of possible ones, specified through the bitrate array with several pairs of values for the btr0 and btr1 registers.
+// If the channel is open and the bitrate is defined, a pair of values btr0, btr1 is returned.
 func OpenChannelDetectBitrate(devnum uint8, timeout time.Duration, bitrate []BitrateRegisterPair) (detected BitrateRegisterPair, err error) {
 
 	if len(bitrate) <= 0 {
