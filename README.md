@@ -4,6 +4,8 @@
 
 `ixxatvci3` works with IXXAT USB-to-CAN devices.
 
+![USB-to-CAN v2](http://hex.pp.ua/img/usbtocan.png)
+
 ## Installation
 
 ```bash
