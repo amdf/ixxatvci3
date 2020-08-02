@@ -114,7 +114,7 @@ func (b *Builder) Btr1(val byte) *Builder {
 
 /*Mode set device mode.
 Possible values:
-"11bit" or "standard",
+"11bit" or "standard" or "base",
 "29bit" or "extended",
 "err" or "errframe",
 "listen" or "listenonly" or "listonly",

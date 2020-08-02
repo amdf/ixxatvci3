@@ -108,7 +108,7 @@ func selectDevice(userselect bool, assignnumber uint8) (vcierr uint32) {
 Call it after SelectDevice but before OpenChannel.
 11-bit mode is a default. Comma is a separator in opmode string.
 opmode values:
-	"11bit" or "standard",
+	"11bit" or "standard" or "base",
 	"29bit" or "extended",
 	"err" or "errframe",
 	"listen" or "listenonly" or "listonly",
@@ -118,7 +118,7 @@ opmode values:
 func SetOperatingMode(devnum uint8, opmode string) (vcierr uint32) {
 	var setMode byte
 
-	if strings.Contains(opmode, "11bit") || strings.Contains(opmode, "standard") {
+	if strings.Contains(opmode, "11bit") || strings.Contains(opmode, "standard") || strings.Contains(opmode, "base") {
 		setMode |= opmodeSTANDARD
 	}
 	if strings.Contains(opmode, "29bit") || strings.Contains(opmode, "extended") {
