@@ -9,14 +9,13 @@ package ixxatvci3
 
 //386:
 //$ /c/TDM-GCC-64/x86_64-w64-mingw32/bin/gendef.exe /C/Windows/SysWOW64/vcinpl.dll
-//$ dlltool -dllname /C/Windows/SysWOW64/vcinpl.dll --def vcinpl.def --output-lib libvcinpl.a --as-flags=--32 -m i386
+//$ dlltool -dllname /C/Windows/SysWOW64/vcinpl.dll --def vcinpl.def --output-lib libvcinpl.a --as-flags=--32 -m i386 -k
 
 #cgo CFLAGS: -I"./inc"
 #cgo amd64 LDFLAGS: -L./amd64 -lvcinpl
 #cgo 386 LDFLAGS: -L./386 -lvcinpl
 #include <vcinpl.h>
 #include "canvci3.h"
-
 */
 import "C"
 import (
