@@ -1,3 +1,5 @@
+#if _WIN32
+
 #include <vcinpl.h>
 #include "vciguid.h"
 #include "canvci3.h"
@@ -416,3 +418,5 @@ static void DisplayError(HRESULT hResult)
 void CAN_VCI3_FormatError(HRESULT hrError, PCHAR pszText, UINT32 dwSize) {
 	vciFormatError(hrError, pszText, dwSize);
 }
+
+#endif
