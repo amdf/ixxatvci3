@@ -7,16 +7,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net"
-	"strings"
+	"os"
+	"strconv"
 	"time"
 
+	"github.com/vishvananda/netlink"
 	"go.einride.tech/can"
 	"go.einride.tech/can/pkg/socketcan"
 )
 
 type ixxatConnection struct {
 	name string // "can0"
+	link netlink.Link
 	conn net.Conn
 	tr   *socketcan.Transmitter
 	recv *socketcan.Receiver
@@ -42,12 +46,48 @@ func OpenDevice(assignnumber uint8) (vcierr uint32) {
 	return selectDevice(false, assignnumber)
 }
 
+func makeLink(name string, speed int) (err error) {
+
+	linkfile := "/etc/network/interfaces.d/" + name
+
+	var f *os.File
+	f, err = os.Create(linkfile)
+
+	if err != nil {
+		err = errors.New("makeLink error: " + err.Error())
+		return
+	}
+	defer f.Close()
+
+	log.Println("link speed ", speed)
+	sp := strconv.Itoa(speed)
+	//`allow-hotplug ` + name + `
+	str := "iface " + name + " can static\nbitrate " + sp + "\n\n"
+
+	_, err = f.Write([]byte(str))
+
+	if err != nil {
+		err = errors.New("makeLink error: " + err.Error())
+		return
+	}
+
+	return
+}
+
 func selectDevice(userselect bool, assignnumber uint8) (vcierr uint32) {
 	if userselect {
 		return VCI_E_NOT_IMPLEMENTED
 	}
-	ifaceName := fmt.Sprintf("can%d", assignnumber)
-	devices[assignnumber] = &ixxatConnection{name: ifaceName}
+
+	_, ok := devices[assignnumber]
+	if ok {
+		return VCI_E_ALREADY_INITIALIZED
+	}
+
+	var dev ixxatConnection
+	dev.name = fmt.Sprintf("can%d", assignnumber)
+
+	devices[assignnumber] = &dev
 
 	return
 }
@@ -64,27 +104,7 @@ opmode values:
 // vcierr is 0 if there are no errors.
 */
 func SetOperatingMode(devnum uint8, opmode string) (vcierr uint32) {
-	var setMode byte
-
-	if strings.Contains(opmode, "11bit") || strings.Contains(opmode, "standard") || strings.Contains(opmode, "base") {
-		setMode |= opmodeSTANDARD
-	}
-	if strings.Contains(opmode, "29bit") || strings.Contains(opmode, "extended") {
-		setMode |= opmodeEXTENDED // reception of 29-bit id messages
-	}
-	if strings.Contains(opmode, "err") {
-		setMode |= opmodeERRFRAME // enable reception of error frames
-	}
-	if strings.Contains(opmode, "list") {
-		setMode |= opmodeLISTONLY // listen only mode (TX passive)
-	}
-	if strings.Contains(opmode, "low") {
-		setMode |= opmodeLOWSPEED // use low speed bus interface
-	}
-
-	// HRESULT GOEXPORT CAN_VCI3_SetOperatingMode(UINT8 uDevNum, BYTE uCanOpMode)
-	// ret := C.CAN_VCI3_SetOperatingMode(C.uchar(devnum), C.uchar(setMode))
-	// vcierr = uint32(ret)
+	//NOTE: not implemented
 
 	return
 }
@@ -100,6 +120,55 @@ func OpenChannel(devnum uint8, btr0 uint8, btr1 uint8) (vcierr uint32) {
 	}
 
 	var err error
+	speed := 0
+	brp := BitrateRegisterPair{Btr0: btr0, Btr1: btr1}
+	switch brp {
+	case Bitrate10kbps:
+		speed = 10000
+	case Bitrate20kbps:
+		speed = 20000
+	case Bitrate25kbps:
+		speed = 25000
+	case Bitrate50kbps:
+		speed = 50000
+	case Bitrate100kbps:
+		speed = 100000
+	case Bitrate125kbps:
+		speed = 125000
+	case Bitrate250kbps:
+		speed = 250000
+	case Bitrate500kbps:
+		speed = 500000
+	case Bitrate800kbps:
+		speed = 800000
+	case Bitrate1000kbps:
+		speed = 1000000
+	}
+
+	//reconfigure
+	err = makeLink(dev.name, speed)
+	if err != nil {
+		return VCI_E_ACCESSDENIED
+	}
+
+	//find link
+	dev.link, err = netlink.LinkByName(dev.name)
+	if err != nil {
+		return VCI_E_NOINTERFACE
+	}
+
+	//stop
+	err = netlink.LinkSetDown(dev.link)
+	if err != nil {
+		return VCI_E_FAIL
+	}
+
+	//start
+	err = netlink.LinkSetUp(dev.link)
+	if err != nil {
+		return VCI_E_FAIL
+	}
+
 	dev.conn, err = socketcan.DialContext(context.Background(), "can", dev.name)
 	if err != nil {
 		return VCI_E_FAIL
@@ -196,7 +265,12 @@ func CloseDevice(devnum uint8) (vcierr uint32) {
 		vcierr = VCI_E_NOT_INITIALIZED
 		return
 	}
-	dev.conn.Close()
+	if nil != dev.recv && nil != dev.tr {
+		dev.recv.Close()
+		dev.tr.Close()
+		dev.conn.Close()
+		netlink.LinkSetDown(dev.link)
+	}
 	delete(devices, devnum)
 	return
 }
