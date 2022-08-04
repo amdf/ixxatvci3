@@ -29,35 +29,6 @@ import (
 	"unsafe"
 )
 
-const vciMaxErrStrLen = 256 // maximum length of an error string
-
-//CANLineStatus информация о статусе линии CAN
-type CANLineStatus struct {
-	OpMode  uint8  // current CAN operating mode
-	BtReg0  uint8  // current bus timing register 0 value
-	BtReg1  uint8  // current bus timing register 1 value
-	BusLoad uint8  // average bus load in percent (0..100)
-	Status  uint32 // status of the CAN controller (see CAN_STATUS_)
-}
-
-//CANChanStatus информация о статусе канала связи
-type CANChanStatus struct {
-	LineStatus CANLineStatus // current CAN line status
-	Activated  uint32        // TRUE if the channel is activated
-	RxOverrun  uint32        // TRUE if receive FIFO overrun occurs
-	RxFifoLoad uint8         // receive FIFO load in percent (0..100)
-	TxFifoLoad uint8         // transmit FIFO load in percent (0..100)
-}
-
-const (
-	opmodeUNDEFINED = 0x00 // undefined
-	opmodeSTANDARD  = 0x01 // reception of 11-bit id messages
-	opmodeEXTENDED  = 0x02 // reception of 29-bit id messages
-	opmodeERRFRAME  = 0x04 // enable reception of error frames
-	opmodeLISTONLY  = 0x08 // listen only mode (TX passive)
-	opmodeLOWSPEED  = 0x10 // use low speed bus interface
-)
-
 //SelectDevice USB-to-CAN device select dialog.
 //assignnumber - number to assign to the device.
 // vcierr is 0 if there are no errors.
