@@ -10,26 +10,24 @@ import (
 	"log"
 	"net"
 	"os"
-	"strconv"
+	"os/exec"
 	"time"
 
-	"github.com/vishvananda/netlink"
 	"go.einride.tech/can"
 	"go.einride.tech/can/pkg/socketcan"
 )
 
-type ixxatConnection struct {
+type connectionCAN struct {
 	name string // "can0"
-	link netlink.Link
 	conn net.Conn
 	tr   *socketcan.Transmitter
 	recv *socketcan.Receiver
 }
 
-var devices map[uint8]*ixxatConnection
+var devices map[uint8]*connectionCAN
 
 func init() {
-	devices = make(map[uint8]*ixxatConnection)
+	devices = make(map[uint8]*connectionCAN)
 }
 
 //SelectDevice USB-to-CAN device select dialog.
@@ -46,34 +44,6 @@ func OpenDevice(assignnumber uint8) (vcierr uint32) {
 	return selectDevice(false, assignnumber)
 }
 
-func makeLink(name string, speed int) (err error) {
-
-	linkfile := "/etc/network/interfaces.d/" + name
-
-	var f *os.File
-	f, err = os.Create(linkfile)
-
-	if err != nil {
-		err = errors.New("makeLink error: " + err.Error())
-		return
-	}
-	defer f.Close()
-
-	log.Println("link speed ", speed)
-	sp := strconv.Itoa(speed)
-	//`allow-hotplug ` + name + `
-	str := "iface " + name + " can static\nbitrate " + sp + "\n\n"
-
-	_, err = f.Write([]byte(str))
-
-	if err != nil {
-		err = errors.New("makeLink error: " + err.Error())
-		return
-	}
-
-	return
-}
-
 func selectDevice(userselect bool, assignnumber uint8) (vcierr uint32) {
 	if userselect {
 		return VCI_E_NOT_IMPLEMENTED
@@ -84,7 +54,7 @@ func selectDevice(userselect bool, assignnumber uint8) (vcierr uint32) {
 		return VCI_E_ALREADY_INITIALIZED
 	}
 
-	var dev ixxatConnection
+	var dev connectionCAN
 	dev.name = fmt.Sprintf("can%d", assignnumber)
 
 	devices[assignnumber] = &dev
@@ -105,8 +75,14 @@ opmode values:
 */
 func SetOperatingMode(devnum uint8, opmode string) (vcierr uint32) {
 	//NOTE: not implemented
-
 	return
+}
+
+func execCmd(command string, args ...string) error {
+	cmdObj := exec.Command(command, args...)
+	cmdObj.Stdout = os.Stdout
+	cmdObj.Stderr = os.Stderr
+	return cmdObj.Run()
 }
 
 //OpenChannel opens a channel on a previously opened device with devnum number, and btr0 and btr1 speed parameters.
@@ -120,54 +96,42 @@ func OpenChannel(devnum uint8, btr0 uint8, btr1 uint8) (vcierr uint32) {
 	}
 
 	var err error
-	speed := 0
+	speed := "0"
 	brp := BitrateRegisterPair{Btr0: btr0, Btr1: btr1}
 	switch brp {
 	case Bitrate10kbps:
-		speed = 10000
+		speed = "10000"
 	case Bitrate20kbps:
-		speed = 20000
+		speed = "20000"
 	case Bitrate25kbps:
-		speed = 25000
+		speed = "25000"
 	case Bitrate50kbps:
-		speed = 50000
+		speed = "50000"
 	case Bitrate100kbps:
-		speed = 100000
+		speed = "100000"
 	case Bitrate125kbps:
-		speed = 125000
+		speed = "125000"
 	case Bitrate250kbps:
-		speed = 250000
+		speed = "250000"
 	case Bitrate500kbps:
-		speed = 500000
+		speed = "500000"
 	case Bitrate800kbps:
-		speed = 800000
+		speed = "800000"
 	case Bitrate1000kbps:
-		speed = 1000000
+		speed = "1000000"
 	}
 
-	//reconfigure
-	err = makeLink(dev.name, speed)
-	if err != nil {
-		return VCI_E_ACCESSDENIED
-	}
-
-	//find link
-	dev.link, err = netlink.LinkByName(dev.name)
-	if err != nil {
-		return VCI_E_NOINTERFACE
-	}
-
-	//stop
-	err = netlink.LinkSetDown(dev.link)
+	err = execCmd("ip", "link", "set", dev.name, "down")
 	if err != nil {
 		return VCI_E_FAIL
 	}
+	log.Println("link", dev.name, "restart")
 
-	//start
-	err = netlink.LinkSetUp(dev.link)
+	err = execCmd("ip", "link", "set", dev.name, "up", "type", "can", "bitrate", speed)
 	if err != nil {
 		return VCI_E_FAIL
 	}
+	log.Println("link", dev.name, "up")
 
 	dev.conn, err = socketcan.DialContext(context.Background(), "can", dev.name)
 	if err != nil {
@@ -176,6 +140,8 @@ func OpenChannel(devnum uint8, btr0 uint8, btr1 uint8) (vcierr uint32) {
 
 	dev.tr = socketcan.NewTransmitter(dev.conn)
 	dev.recv = socketcan.NewReceiver(dev.conn)
+
+	log.Println("connection", dev.name, "established")
 
 	return
 }
@@ -191,7 +157,10 @@ func Send(devnum uint8, msgid uint32, rtr bool, msgdata []byte) (vcierr uint32) 
 	if !ok {
 		return VCI_E_NOT_INITIALIZED
 	}
-
+	if nil == dev.tr {
+		vcierr = VCI_E_NOT_INITIALIZED
+		return
+	}
 	if len(msgdata) > 8 {
 		return VCI_E_INVALIDARG
 	}
@@ -232,6 +201,11 @@ func Receive(devnum uint8) (vcierr uint32, msgid uint32, rtr bool, msgdata [8]by
 		return
 	}
 
+	if nil == dev.recv {
+		vcierr = VCI_E_NOT_INITIALIZED
+		return
+	}
+
 	if !dev.recv.Receive() {
 		vcierr = VCI_E_FAIL
 		return
@@ -253,7 +227,7 @@ func GetStatus(devnum uint8) (status CANChanStatus, vcierr uint32) {
 
 //GetErrorText returns VCI error text by code
 func GetErrorText(vcierr uint32) string {
-	result := fmt.Sprint("error code", vcierr)
+	result := fmt.Sprint("err: ", vcierr)
 
 	return result
 }
@@ -266,10 +240,17 @@ func CloseDevice(devnum uint8) (vcierr uint32) {
 		return
 	}
 	if nil != dev.recv && nil != dev.tr {
+
 		dev.recv.Close()
 		dev.tr.Close()
 		dev.conn.Close()
-		netlink.LinkSetDown(dev.link)
+		log.Println("connection closed")
+		err := execCmd("ip", "link", "set", dev.name, "down")
+		if err != nil {
+			log.Println("close link error", err)
+		} else {
+			log.Println("link closed")
+		}
 	}
 	delete(devices, devnum)
 	return
@@ -280,11 +261,5 @@ func CloseDevice(devnum uint8) (vcierr uint32) {
 // If the channel is open and the bitrate is defined, a pair of values btr0, btr1 is returned.
 func OpenChannelDetectBitrate(devnum uint8, timeout time.Duration, bitrate []BitrateRegisterPair) (detected BitrateRegisterPair, err error) {
 	err = errors.New("not implemented")
-	return
-}
-
-//see VCI canControlDetectBitrate
-func openChannelDetectBitrate(devnum uint8, timeoutMs uint16, arrayBtr0 []byte, arrayBtr1 []byte) (vcierr uint32, indexArray int32) {
-	vcierr = VCI_E_NOT_IMPLEMENTED
 	return
 }
