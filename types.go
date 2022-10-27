@@ -1,7 +1,5 @@
 package ixxatvci3
 
-import "C"
-
 //BitrateRegisterPair Two CAN bitrate registers.
 type BitrateRegisterPair struct {
 	Btr0 byte
