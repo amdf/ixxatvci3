@@ -30,15 +30,15 @@ func init() {
 	devices = make(map[uint8]*connectionCAN)
 }
 
-//SelectDevice USB-to-CAN device select dialog.
-//assignnumber - number to assign to the device.
+// SelectDevice USB-to-CAN device select dialog.
+// assignnumber - number to assign to the device.
 // vcierr is 0 if there are no errors.
 func SelectDevice(assignnumber uint8) (vcierr uint32) {
 	return selectDevice(true, assignnumber)
 }
 
-//OpenDevice opens first USB-to-CAN device found.
-//assignnumber - number to assign to the device.
+// OpenDevice opens first USB-to-CAN device found.
+// assignnumber - number to assign to the device.
 // vcierr is 0 if there are no errors.
 func OpenDevice(assignnumber uint8) (vcierr uint32) {
 	return selectDevice(false, assignnumber)
@@ -62,15 +62,18 @@ func selectDevice(userselect bool, assignnumber uint8) (vcierr uint32) {
 	return
 }
 
-/*SetOperatingMode set operating mode at device with number "devnum".
+/*
+SetOperatingMode set operating mode at device with number "devnum".
 Call it after SelectDevice but before OpenChannel.
 11-bit mode is a default. Comma is a separator in opmode string.
 opmode values:
+
 	"11bit" or "standard" or "base",
 	"29bit" or "extended",
 	"err" or "errframe",
 	"listen" or "listenonly" or "listonly",
 	"low" or "lowspeed"
+
 // vcierr is 0 if there are no errors.
 */
 func SetOperatingMode(devnum uint8, opmode string) (vcierr uint32) {
@@ -85,10 +88,10 @@ func execCmd(command string, args ...string) error {
 	return cmdObj.Run()
 }
 
-//OpenChannel opens a channel on a previously opened device with devnum number, and btr0 and btr1 speed parameters.
-//25 kbps is 0x1F 0x16.
-//125 кб/с is 0x03 0x1C.
-//vcierr is 0 if there are no errors.
+// OpenChannel opens a channel on a previously opened device with devnum number, and btr0 and btr1 speed parameters.
+// 25 kbps is 0x1F 0x16.
+// 125 кб/с is 0x03 0x1C.
+// vcierr is 0 if there are no errors.
 func OpenChannel(devnum uint8, btr0 uint8, btr1 uint8) (vcierr uint32) {
 	dev, ok := devices[devnum]
 	if !ok {
@@ -121,13 +124,13 @@ func OpenChannel(devnum uint8, btr0 uint8, btr1 uint8) (vcierr uint32) {
 		speed = "1000000"
 	}
 
-	err = execCmd("ip", "link", "set", dev.name, "down")
+	err = execCmd("sudo", "ip", "link", "set", dev.name, "down")
 	if err != nil {
 		return VCI_E_FAIL
 	}
 	log.Println("link", dev.name, "restart")
 
-	err = execCmd("ip", "link", "set", dev.name, "up", "type", "can", "bitrate", speed)
+	err = execCmd("sudo", "ip", "link", "set", dev.name, "up", "type", "can", "bitrate", speed)
 	if err != nil {
 		return VCI_E_FAIL
 	}
@@ -225,14 +228,14 @@ func GetStatus(devnum uint8) (status CANChanStatus, vcierr uint32) {
 	return
 }
 
-//GetErrorText returns VCI error text by code
+// GetErrorText returns VCI error text by code
 func GetErrorText(vcierr uint32) string {
 	result := fmt.Sprint("err: ", vcierr)
 
 	return result
 }
 
-//CloseDevice close channel and free device with number "devnum".
+// CloseDevice close channel and free device with number "devnum".
 func CloseDevice(devnum uint8) (vcierr uint32) {
 	dev, ok := devices[devnum]
 	if !ok {
