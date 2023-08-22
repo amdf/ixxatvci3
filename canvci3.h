@@ -1,3 +1,6 @@
+//go:build windows
+// +build windows
+
 #ifndef _CANVCI3_H_
 #define _CANVCI3_H_
 

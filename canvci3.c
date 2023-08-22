@@ -1,3 +1,6 @@
+//go:build windows
+// +build windows
+
 #if _WIN32
 
 #include <vcinpl.h>
